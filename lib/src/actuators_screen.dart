@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'events_screen.dart';
+import 'actuators_screen.dart';
+import 'home_screen.dart';
 
 class ActuatorsScreen extends StatefulWidget {
   @override
@@ -57,6 +60,43 @@ class _ActuatorsScreenState extends State<ActuatorsScreen> {
             ],
           );
         },
+      ),
+      bottomNavigationBar: BottomAppBar(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.home),
+              onPressed: () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => HomeScreen()),
+                  (route) => false, // Impede a navegação de voltar
+                );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.format_list_bulleted),
+              onPressed: () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => EventsScreen()),
+                  (route) => false, // Impede a navegação de voltar
+                );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.data_usage),
+              onPressed: () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => ActuatorsScreen()),
+                  (route) => false, // Impede a navegação de voltar
+                );
+              },
+            )
+          ],
+        ),
       ),
     );
   }

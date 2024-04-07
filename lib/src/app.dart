@@ -23,10 +23,10 @@ class LoginPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Login'),
+        title: const Text('Login'),
       ),
       body: Padding(
-        padding: EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(20.0),
         child: LoginForm(),
       ),
     );
@@ -53,7 +53,7 @@ class _LoginFormState extends State<LoginForm> {
             labelText: 'Username',
           ),
         ),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
         TextField(
           controller: _passwordController,
           obscureText: true,
@@ -75,7 +75,7 @@ class _LoginFormState extends State<LoginForm> {
               MaterialPageRoute(builder: (context) => HomeScreen()),
             );
           },
-          child: Text('Login'),
+          child: const Text('Login'),
         ),
         ElevatedButton(
           onPressed: () {
@@ -84,7 +84,7 @@ class _LoginFormState extends State<LoginForm> {
             String password = _passwordController.text;
             print('Username: $username, Password: $password');
           },
-          child: Text('Forgot Password?'),
+          child: const Text('Forgot Password?'),
         ),
       ],
     );

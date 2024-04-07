@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'actuators_screen';
+import 'actuators_screen.dart';
 import 'events_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -56,35 +56,33 @@ class HomeScreen extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.home),
               onPressed: () {
-                // Implemente a ação para o botão Home
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => HomeScreen()),
+                  (route) => false, // Impede a navegação de voltar
+                );
               },
             ),
             IconButton(
               icon: const Icon(Icons.format_list_bulleted),
               onPressed: () {
-                // Implemente a ação para o botão Dados
-                Navigator.push(
+                Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (context) => EventsScreen()),
+                  (route) => false, // Impede a navegação de voltar
                 );
               },
             ),
             IconButton(
               icon: const Icon(Icons.data_usage),
               onPressed: () {
-                // Implemente a ação para o botão Dados
-                Navigator.push(
+                Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (context) => ActuatorsScreen()),
+                  (route) => false, // Impede a navegação de voltar
                 );
               },
-            ),
-            IconButton(
-              icon: const Icon(Icons.warning),
-              onPressed: () {
-                // Implemente a ação para o botão Alerta
-              },
-            ),
+            )
           ],
         ),
       ),
