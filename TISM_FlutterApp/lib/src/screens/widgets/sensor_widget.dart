@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/sensor.dart'; 
+import 'dart:math';
 import '../components/sensor_details.dart';
 
 class SensorWidget extends StatelessWidget {
@@ -15,7 +16,7 @@ class SensorWidget extends StatelessWidget {
         style: TextStyle(fontSize: 16.0),
       ),
       subtitle: Text(
-        'Value: ${sensor.analogValue != null ? sensor.analogValue.toString() : sensor.digitalValue != null ? sensor.digitalValue.toString() : ''}',
+        'Value: ' + (sensor.analogValue != null ? sensor.analogValue!.toStringAsFixed(2): (sensor.digitalValue != null ? sensor.digitalValue.toString() : '')),
         style: TextStyle(fontSize: 14.0),
       ),
       onTap: () {

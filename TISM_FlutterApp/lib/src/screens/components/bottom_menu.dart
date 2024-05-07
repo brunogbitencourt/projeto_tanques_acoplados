@@ -25,6 +25,8 @@ class _BottomMenuState extends State<BottomMenu> {
           _selectedIndex = index;
         });
 
+        
+
         // Coloque o código de navegação aqui, conforme necessário
         switch (_selectedIndex) {
           case 0:
@@ -51,6 +53,10 @@ class _BottomMenuState extends State<BottomMenu> {
           case 3:
             // Faça algo quando o item "Configurations" for selecionado
             break;
+          case 4:
+            // Faça algo quando o item "About Us" for selecionado
+            break;
+          
         }
       },
       items: const [
@@ -72,7 +78,7 @@ class _BottomMenuState extends State<BottomMenu> {
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.info),
-          label: 'About Uu',
+          label: 'About Us',
         ),
       ],
     );
