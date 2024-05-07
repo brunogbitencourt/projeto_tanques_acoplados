@@ -38,9 +38,3 @@ class EventsScreen extends StatelessWidget {
     );
   }
 }
-
-void main() {
-  runApp(MaterialApp(
-    home: EventsScreen(),
-  ));
-}
