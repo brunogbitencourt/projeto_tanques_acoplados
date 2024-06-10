@@ -1,0 +1,6 @@
+@TISM_FIREBASE_HostAddress = http://localhost:5019
+
+GET {{TISM_FIREBASE_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
