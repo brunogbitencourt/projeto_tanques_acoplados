@@ -1,117 +1,54 @@
-class Sensor{
-  int? id;
+import 'package:flutter/material.dart'; // Se necessário
+
+class Sensor {
+  String? id;
   String? description;
   int? type;
-  int? outPutPin1;
-  int? outPutPin2;
+  int? outputPin1;
+  int? outputPin2;
+  DateTime? timestamp;
   double? analogValue;
   bool? digitalValue;
-  DateTime? timeStamp;
+  String? unit;
 
   Sensor({
     this.id,
     this.description,
     this.type,
-    this.outPutPin1,
-    this.outPutPin2,
-    required this.analogValue,
+    this.outputPin1,
+    this.outputPin2,
+    this.timestamp,
+    this.analogValue,
     this.digitalValue,
-    this.timeStamp,
+    this.unit,
   });
 
-  Sensor.fromJson(Map<String, dynamic> json) {
-    id = json['id'];
-    description = json['description'];
-    type = json['type'];
-    outPutPin1 = json['outPutPin1'];
-    outPutPin2 = json['outPutPin2'];
-    analogValue = json['analogValue'];
-    digitalValue = json['digitalValue'];
-    timeStamp = DateTime.parse(json['timeStamp']);
-  }
-
-  Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = <String, dynamic>{};
-    data['id'] = id;
-    data['description'] = description;
-    data['type'] = type;
-    data['outPutPin1'] = outPutPin1;
-    data['outPutPin2'] = outPutPin2;
-    data['analogValue'] = analogValue;
-    data['digitalValue'] = digitalValue;
-    data['timeStamp'] = timeStamp!.toIso8601String();
-    return data;
-  }
-
-  void setAnalogValue(double value){
-    analogValue = value;
-  }
-
-  void setDigitalValue(bool value){
-    digitalValue = value;
-  }
-
-  void setDescription(String value){
-    description = value;
-  }
-
-  void setType(int value){
-    type = value;
-  }
-
-  void setOutPutPin1(int value){
-    outPutPin1 = value;
-  }
-
-  void setOutPutPin2(int value){
-    outPutPin2 = value;
-  }
-
-  double getAnalogValue(){
-    return analogValue!;
-  }
-
-  bool getDigitalValue(){
-    return digitalValue!;
-  }
-
-  String getDescription(){
-    return description!;
-  }
-
-  int getType(){
-    return type!;
-  }
-
-  int getOutPutPin1(){
-    return outPutPin1!;
-  }
-
-  int getOutPutPin2(){
-    return outPutPin2!;
-  }
-
-  int getId(){
-    return id!;
-  }
-
-  void setId(int value){
-    id = value;
-  }
-
-  DateTime getTimeStamp(){
-    return timeStamp!;
-  }
-
-  void setTimeStamp(DateTime value){
-    timeStamp = value;
-  }
-
-
-
-
-
-
+  factory Sensor.fromJson(Map<String, dynamic> json) {
+  return Sensor(
+    id: json['id'],
+    description: json['description'],
+    type: json['type'],
+    outputPin1: json['outputPin1'],
+    outputPin2: json['outputPin2'],
+    timestamp: DateTime.tryParse(json['timestamp'] ?? ''),
+    analogValue: (json['analogValue'] as num?)?.toDouble() ?? 0.0, // Convertendo para double
+    digitalValue: json['digitalValue'],
+    unit: json['unit'],
+  );
 }
 
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'description': description,
+      'type': type,
+      'outputPin1': outputPin1,
+      'outputPin2': outputPin2,
+      'timestamp': timestamp!.toIso8601String(),
+      'analogValue': analogValue,
+      'digitalValue': digitalValue,
+      'unit': unit,
+    };
+  }
+}

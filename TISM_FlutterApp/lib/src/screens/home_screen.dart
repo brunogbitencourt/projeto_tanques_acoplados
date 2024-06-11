@@ -1,10 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:appiot/src/db/db.dart';
-import '../screens/components/bottom_menu.dart'; // BottomMenu import
-import '../models/sensor.dart'; // Sensor import
-import '../models/actuators.dart'; // Actuator import
-import '../screens/components/sensor_form.dart'; // SensorForm import
-import '../screens/components/actuator_form.dart'; // ActuatorsForm import
+import 'package:appiot/src/api/firebaseapi.dart';
+import 'package:appiot/src/models/sensor.dart';
+import '../screens/components/bottom_menu.dart';
+import 'components/sensor_form.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -12,81 +11,101 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  Future<List<Sensor>> _fetchSensors() async {
-    // Simulating database operations
-    var sensorsType = [1, 2, 3, 4, 5, 6];
-    List<Sensor> sensors = [];
-    
-    for (var sensorType in sensorsType) {
-      print('Fetching sensor of type $sensorType');
-      await Db.insertExampleData(Db.database, sensorType);
-    }
+  final Firebaseapi _firebaseapi = Firebaseapi();
+  late List<Sensor> _sensorData = [];
+  late Timer _timer;
 
-    for (var sensorType in sensorsType) {
-      print('Fetching sensor of type $sensorType');
-      sensors.add(await Db.getLastSensorByType(sensorType));
-    }
-
-    return sensors;
+  @override
+  void initState() {
+    super.initState();
+    _fetchSensorData();
+    // Atualiza os dados a cada minuto
+    _timer = Timer.periodic(Duration(minutes: 60), (timer) {
+      if (mounted) { // Verifica se o widget ainda está montado
+        _fetchSensorData();
+      }
+    });
   }
 
-  Future<List<Actuator>> _fetchActuators() async {
-    return [
-      Actuator(id: 1, description: 'Pump 01', type: 1, outPutPin: 1, pwmOutput: 2, state: 0, timeStamp: DateTime.now()),
-      Actuator(id: 2, description: 'Pump 02', type: 1, outPutPin: 3, pwmOutput: 4, state: 1, timeStamp: DateTime.now()),
-      Actuator(id: 3, description: 'Pump 03', type: 1, outPutPin: 5, pwmOutput: 6, state: 0, timeStamp: DateTime.now()),
-      Actuator(id: 4, description: 'Valve 01', type: 2, outPutPin: 7, pwmOutput: 8, state: 0, timeStamp: DateTime.now()),
-      Actuator(id: 5, description: 'Valve 02', type: 2, outPutPin: 9, pwmOutput: 10, state: 1, timeStamp: DateTime.now()),
-    ];
-  }
+  @override
+  void dispose() {
+    _timer.cancel(); // Cancela o timer quando o widget é removido
+    super.dispose();
+  }  
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Main Vision of the System'),
+        title: Text(
+          'TISM - Visão Geral do Processo',
+          style: TextStyle(
+            fontSize: 20, // Tamanho da fonte
+            color: Colors.green.shade700, // Cor verde
+            fontWeight: FontWeight.bold, // Negrito
+          ),
+          textAlign: TextAlign.center, // Alinhamento centralizado
+        ),
       ),
-      body: FutureBuilder<List<Sensor>>(
-        future: _fetchSensors(),
-        builder: (BuildContext context, AsyncSnapshot<List<Sensor>> snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else {
-            List<Sensor> sensors = snapshot.data ?? [];
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                Text(
-                  'Sensors',
-                  style: TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
-                ),
-                SensorForm(sensors: sensors),
-                Divider(),
-                Text(
-                  'Actuators',
-                  style: TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
-                ),
-                FutureBuilder<List<Actuator>>(
-                  future: _fetchActuators(),
-                  builder: (BuildContext context, AsyncSnapshot<List<Actuator>> snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    } else {
-                      List<Actuator> actuators = snapshot.data ?? [];
-                      return ActuatorsForm(actuators: actuators);
-                    }
-                  },
-                ),
-              ],
-            );
-          }
-        },
+      body: Column(
+        children: [
+          SensorForm(sensors: _sensorData),
+          Divider( // Adiciona uma linha entre os formulários e o próximo título
+            color: Colors.green.shade700, // Cor verde
+            thickness: 2, // Espessura da linha
+          ),
+          Text( // Título para os Atuadores
+            'Atuadores',
+            style: TextStyle(
+              fontSize: 18, // Tamanho da fonte
+              color: Colors.green.shade700, // Cor verde
+              fontWeight: FontWeight.bold, // Negrito
+            ),
+          ),
+          // Aqui você pode adicionar mais widgets para os atuadores
+        ],
       ),
       bottomNavigationBar: BottomMenu(),
     );
   }
+
+  Future<void> _fetchSensorData() async {
+  try {
+    final sensorInfoList = await _firebaseapi.fetchSensorInfo();
+    final sensorDataMap = await _firebaseapi.fetchLastSensorsDataValueMap();
+
+    final List<Sensor> newData = sensorInfoList.map((info) {
+      final sensorData = sensorDataMap[info.id];
+      return sensorData != null
+          ? Sensor(
+              id: info.id,
+              description: info.description,
+              type: info.type,
+              outputPin1: info.outputPin1,
+              outputPin2: info.outputPin2,
+              timestamp: sensorData.timestamp,
+              analogValue: sensorData.analogValue,
+              digitalValue: sensorData.digitalValue,
+              unit: sensorData.unit,
+            )
+          : Sensor(
+              id: info.id,
+              description: info.description,
+              type: info.type,
+              outputPin1: info.outputPin1,
+              outputPin2: info.outputPin2,
+            );
+    }).toList();
+
+    if (mounted) {
+      setState(() {
+        _sensorData = newData;
+      });
+    }
+  } catch (e) {
+    print('Failed to fetch sensor data: $e');
+  }
+}
+
+
 }

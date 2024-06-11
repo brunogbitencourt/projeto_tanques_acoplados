@@ -49,11 +49,11 @@ static Future<Database> connect() async {
           id : sensorMap['id'],
           description : sensorMap['description'],
           type : sensorMap['type'],
-          outPutPin1 : sensorMap['outPutPin1'],
-          outPutPin2 : sensorMap['outPutPin2'],
-          analogValue : sensorMap['analogValue'],
-          digitalValue : sensorMap['digitalValue'],
-          timeStamp : DateTime.parse(sensorMap['TimeStamp']),
+          //outPutPin1 : sensorMap['outPutPin1'],
+          //outPutPin2 : sensorMap['outPutPin2'],
+          //analogValue : sensorMap['analogValue'],
+          //digitalValue : sensorMap['digitalValue'],
+          //timeStamp : DateTime.parse(sensorMap['TimeStamp']),
         );
 
         sensors.add(sensor);
@@ -79,23 +79,23 @@ static Future<Database> connect() async {
         id: result[0]['id'],
         description: result[0]['description'],
         type: result[0]['type'],
-        outPutPin1: result[0]['outPutPin1'],
-        outPutPin2: result[0]['outPutPin2'],
-        analogValue: result[0]['analogValue'],
-        digitalValue: (result[0]['digitalValue'] == 1) ? true : false,
-        timeStamp: DateTime.parse(result[0]['timeStamp']),
+        //outPutPin1: result[0]['outPutPin1'],
+        //outPutPin2: result[0]['outPutPin2'],
+        //analogValue: result[0]['analogValue'],
+        //digitalValue: (result[0]['digitalValue'] == 1) ? true : false,
+        //timeStamp: DateTime.parse(result[0]['timeStamp']),
       );
     }
   }
   return Sensor(
-        id: 0,
+    //    id: 0,
         description: "",
         type: -1,
-        outPutPin1: -1,
-        outPutPin2: -1,
-        analogValue: -1,
-        digitalValue: false,
-        timeStamp: DateTime.now(),
+        //outPutPin1: -1,
+        //outPutPin2: -1,
+        //analogValue: -1,
+        //digitalValue: false,
+        //timeStamp: DateTime.now(),
       );
 }
 
@@ -113,11 +113,11 @@ static Future<List<Sensor>> selectFromTableSensorsLimit() async
         id : sensorMap['id'],
         description : sensorMap['description'],
         type : sensorMap['type'],
-        outPutPin1 : sensorMap['outPutPin1'],
-        outPutPin2 : sensorMap['outPutPin2'],
-        analogValue : sensorMap['analogValue'],
-        digitalValue: (sensorMap['digitalValue'] == 1) ? true : false,
-        timeStamp : DateTime.parse(sensorMap['TimeStamp']),
+        //outPutPin1 : sensorMap['outPutPin1'],
+        ///outPutPin2 : sensorMap['outPutPin2'],
+        //analogValue : sensorMap['analogValue'],
+        //digitalValue: (sensorMap['digitalValue'] == 1) ? true : false,
+        //timeStamp : DateTime.parse(sensorMap['TimeStamp']),
       );
 
       sensors.add(sensor);
