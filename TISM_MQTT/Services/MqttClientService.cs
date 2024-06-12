@@ -48,6 +48,8 @@ namespace TISM_MQTT.Services
                 _logger.LogInformation("Connected to MQTT broker");
                 await _mqttClient.SubscribeAsync(new MqttTopicFilterBuilder().WithTopic("sensors/data").Build());
                 _logger.LogInformation("Subscribed to topic sensors/data");
+                await _mqttClient.SubscribeAsync(new MqttTopicFilterBuilder().WithTopic("actuators/data").Build());
+                _logger.LogInformation("Subscribed to topic actuators/data");
             });
 
             _mqttClient.UseApplicationMessageReceivedHandler(async e =>
@@ -85,18 +87,32 @@ namespace TISM_MQTT.Services
             }
         }
 
-        public async Task PublishMessageAsync(string topic, string message)
+        public async Task<bool> PublishMessageAsync(string topic, string message)
         {
             if (_mqttClient.IsConnected)
             {
-                var mqttMessage = new MqttApplicationMessageBuilder()
-                    .WithTopic(topic)
-                    .WithPayload(message)
-                    .WithExactlyOnceQoS()
-                    .Build();
+                try
+                {
+                    var mqttMessage = new MqttApplicationMessageBuilder()
+                        .WithTopic(topic)
+                        .WithPayload(message)
+                        .WithExactlyOnceQoS()
+                        .Build();
 
-                await _mqttClient.PublishAsync(mqttMessage);
+                    await _mqttClient.PublishAsync(mqttMessage);
+                    _logger.LogInformation($"Message published to topic {topic}: {message}");
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Failed to publish message to topic {topic}");
+                }
             }
+            else
+            {
+                _logger.LogWarning("MQTT client is not connected");
+            }
+            return false;
         }
 
         public async Task SubscribeToTopicAsync(string topic)
@@ -151,6 +167,50 @@ namespace TISM_MQTT.Services
             }
         }
 
+        public async Task PostActuatorToApi(JsonElement actuator)
+        {
+            var actuatorJson = actuator.GetRawText(); // Obtém o JSON do atuador
+            var content = new StringContent(actuatorJson, Encoding.UTF8, "application/json");
+
+            try
+            {
+                var response = await _httpClient.PostAsync("https://tismfirebase.azurewebsites.net/api/Actuator", content);
+                response.EnsureSuccessStatusCode();
+                var responseBody = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation($"Successfully posted actuator to API. Response: {responseBody}");
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, $"Error posting actuator to API. Message: {ex.Message}, Status Code: {ex.StatusCode}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An unexpected error occurred while posting actuator to the API.");
+            }
+        }
+
+        private async Task PostActuatorDataToApi(JsonElement actuatorData)
+        {
+            var actuatorDataJson = actuatorData.GetRawText(); // Obtém o JSON dos dados do atuador
+            var content = new StringContent(actuatorDataJson, Encoding.UTF8, "application/json");
+
+            try
+            {
+                var response = await _httpClient.PostAsync("https://tismfirebase.azurewebsites.net/api/ActuatorData", content);
+                response.EnsureSuccessStatusCode();
+                var responseBody = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation($"Successfully posted actuator data to API. Response: {responseBody}");
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, $"Error posting actuator data to API. Message: {ex.Message}, Status Code: {ex.StatusCode}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An unexpected error occurred while posting actuator data to the API.");
+            }
+        }
+
         private async Task ProcessMessage(JsonElement message)
         {
             if (message.TryGetProperty("devices", out var devicesProperty))
@@ -159,8 +219,7 @@ namespace TISM_MQTT.Services
                 {
                     foreach (var sensorProperty in sensorsProperty.EnumerateObject())
                     {
-
-                        var id = sensorProperty.Name;
+                        var id = sensorProperty.Value.GetProperty("id").GetString();
                         var description = sensorProperty.Value.GetProperty("description").GetString();
                         var outputPin1 = sensorProperty.Value.TryGetProperty("OutputPin1", out var outputPin1Property) ? outputPin1Property.GetInt32() : 0;
                         var outputPin2 = sensorProperty.Value.TryGetProperty("OutputPin2", out var outputPin2Property) ? outputPin2Property.GetInt32() : 0;
@@ -187,8 +246,6 @@ namespace TISM_MQTT.Services
                     foreach (var sensorDataProperty in sensorsDataProperty.EnumerateObject())
                     {
                         var sensorId = sensorDataProperty.Name;
-
-                        
                         foreach (var timestampProperty in sensorDataProperty.Value.EnumerateObject())
                         {
                             var timestamp = timestampProperty.Name;
@@ -204,7 +261,7 @@ namespace TISM_MQTT.Services
                                 Id = id,
                                 Timestamp = timestampValue,
                                 AnalogValue = analogValue,
-                                DigitalValue = digitalValue, 
+                                DigitalValue = digitalValue,
                                 Unit = unit
                             };
 
@@ -215,16 +272,67 @@ namespace TISM_MQTT.Services
                         }
                     }
                 }
+                if(devicesProperty.TryGetProperty("actuators", out var actuatorsProperty))
+                {
+                    foreach (var actuatorProperty in actuatorsProperty.EnumerateObject())
+                    {
+                        var id = actuatorProperty.Name;
+                        var description = actuatorProperty.Value.GetProperty("description").GetString();
+                        var outputPin = actuatorProperty.Value.TryGetProperty("outputPin", out var outputPinProperty) ? outputPinProperty.GetInt32() : 0;
+                        var typeActuator = actuatorProperty.Value.TryGetProperty("type", out var typeActuatorProperty) ? typeActuatorProperty.GetInt32() : 0;
+
+                        var actuatorObj = new Actuator
+                        {
+                            Id = id,
+                            Description = description,
+                            OutputPin = outputPin,
+                            TypeActuator = typeActuator
+                        };
+
+                        var actuatorJson = JsonSerializer.Serialize(actuatorObj);
+                        var jsonElement = JsonDocument.Parse(actuatorJson).RootElement;
+
+                        await PostActuatorToApi(jsonElement);
+                    }
+                }
+
+                if (devicesProperty.TryGetProperty("actuators_data", out var actuatorsDataProperty))
+                {
+                    foreach (var actuatorDataProperty in actuatorsDataProperty.EnumerateObject())
+                    {
+                        var actuatorId = actuatorDataProperty.Name;
+                        foreach (var timestampProperty in actuatorDataProperty.Value.EnumerateObject())
+                        {
+                            var timestamp = timestampProperty.Name;
+
+                            var id = actuatorId;
+
+                            var timestampValue = timestampProperty.Value.GetProperty("TimeStamp").GetDateTime();
+                            var outputPWM = timestampProperty.Value.GetProperty("OutputPWM").GetInt32();
+                            var state = timestampProperty.Value.GetProperty("State").GetInt32();
+                            var unit = timestampProperty.Value.GetProperty("Unit").GetString();
+
+                            var actuatorDataObj = new ActuatorData
+                            {
+                                Id = id,
+                                TimeStamp = timestampValue,
+                                OutputPWM = outputPWM,
+                                State = state,
+                                Unit = unit
+                            };
+
+                            var actuatorJson = JsonSerializer.Serialize(actuatorDataObj);
+                            var jsonElement = JsonDocument.Parse(actuatorJson).RootElement;
+
+                            await PostActuatorDataToApi(jsonElement);
+                        }
+                    }
+                }
             }
             else
             {
                 _logger.LogWarning("Received message does not contain the expected structure.");
             }
         }
-
-
-
-
-
     }
 }
