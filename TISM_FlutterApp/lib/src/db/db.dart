@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:appiot/src/models/actuator.dart';
 import 'package:appiot/src/models/sensor.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
@@ -6,22 +7,65 @@ import 'package:sqflite/sqflite.dart';
 class Db {
   static Database? database;
 
-static Future<Database> connect() async {
-  var databasesPath = await getDatabasesPath();
-  String path = join(databasesPath, 'tism.db');
-  Database database = await openDatabase(path, version: 1,
-    onCreate: (Database db, int version) async {
-      await db.execute(
-        'CREATE TABLE Sensors (id INTEGER PRIMARY KEY, description TEXT, type INT, outPutPin1 INTEGER, outPutPin2 INTEGER, analogValue REAL, digitalValue INTEGER);');
-    });
+  static Future<Database> connect() async {
+    var databasesPath = await getDatabasesPath();
+    String path = join(databasesPath, 'tism.db');
 
-  return database;
-}
+    // Abre o banco de dados e cria a tabela caso não exista
+    Database database = await openDatabase(
+      path,
+      version: 1,
+      onCreate: (Database db, int version) async {
+        await db.execute('CREATE TABLE Sensors ('
+            'id TEXT, '
+            'timestamp TEXT, '
+            'description TEXT, '
+            'type INTEGER, '
+            'outPutPin1 INTEGER, '
+            'outPutPin2 INTEGER, '
+            'analogValue REAL, '
+            'digitalValue INTEGER, '
+            'unit TEXT, '
+            'PRIMARY KEY (id, timestamp)'
+            ');');
 
-  static Future<void> insertExampleData(Database? database, int? type) async 
-  {
+        await db.execute('CREATE TABLE Actuators('
+            'id TEXT, '
+            'timestamp TEXT, '
+            'description TEXT, '
+            'typeActuator INTEGER, '
+            'outputPin INTEGER, '
+            'state INTEGER, '
+            'outputPWM REAL, '
+            'unit TEXT, '
+            'PRIMARY KEY (id, timeStamp)' 
+           ')');
+        
+      },
+    );
+
+    return database;
+  }
+
+  static Future<void> insertSensor(Database db, Sensor sensor) async {
+    await db.insert(
+      'Sensors',
+      sensor.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  static Future<void> insertActuator(Database db, Actuator actuator) async {
+    await db.update(
+      'Actuators', 
+      actuator.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace
+    );
+  }
+
+  static Future<void> insertExampleData(Database? database, int? type) async {
     Random random = Random();
-  // Inserir alguns dados de exemplo
+    // Inserir alguns dados de exemplo
     await database?.insert(
       'Sensors',
       {
@@ -36,19 +80,18 @@ static Future<Database> connect() async {
     );
   }
 
-  static Future<List<Sensor>> selectFromTableSensors() async 
-  {  
+  static Future<List<Sensor>> selectFromTableSensors() async {
     List<Sensor> sensors = [];
 
-    if (Db.database != null)
-    {
-      List<Map<String, dynamic>> sensorsMap = await Db.database!.query('Sensors');
+    if (Db.database != null) {
+      List<Map<String, dynamic>> sensorsMap =
+          await Db.database!.query('Sensors');
 
       for (var sensorMap in sensorsMap) {
         Sensor sensor = Sensor(
-          id : sensorMap['id'],
-          description : sensorMap['description'],
-          type : sensorMap['type'],
+          id: sensorMap['id'],
+          description: sensorMap['description'],
+          type: sensorMap['type'],
           //outPutPin1 : sensorMap['outPutPin1'],
           //outPutPin2 : sensorMap['outPutPin2'],
           //analogValue : sensorMap['analogValue'],
@@ -64,9 +107,8 @@ static Future<Database> connect() async {
   }
 
   static Future<Sensor> getLastSensorByType(int type) async {
-  if (Db.database != null) {
-    List<Map<String, dynamic>> result = await Db.database!.rawQuery(
-    '''
+    if (Db.database != null) {
+      List<Map<String, dynamic>> result = await Db.database!.rawQuery('''
       SELECT *
       FROM Sensors
       WHERE type = ?
@@ -74,56 +116,55 @@ static Future<Database> connect() async {
       LIMIT 1
     ''', [type]);
 
-    if (result.isNotEmpty) {
-      return Sensor(
-        id: result[0]['id'],
-        description: result[0]['description'],
-        type: result[0]['type'],
-        //outPutPin1: result[0]['outPutPin1'],
-        //outPutPin2: result[0]['outPutPin2'],
-        //analogValue: result[0]['analogValue'],
-        //digitalValue: (result[0]['digitalValue'] == 1) ? true : false,
-        //timeStamp: DateTime.parse(result[0]['timeStamp']),
-      );
+      if (result.isNotEmpty) {
+        return Sensor(
+          id: result[0]['id'],
+          description: result[0]['description'],
+          type: result[0]['type'],
+          //outPutPin1: result[0]['outPutPin1'],
+          //outPutPin2: result[0]['outPutPin2'],
+          //analogValue: result[0]['analogValue'],
+          //digitalValue: (result[0]['digitalValue'] == 1) ? true : false,
+          //timeStamp: DateTime.parse(result[0]['timeStamp']),
+        );
+      }
     }
+    return Sensor(
+      //    id: 0,
+      description: "",
+      type: -1,
+      //outPutPin1: -1,
+      //outPutPin2: -1,
+      //analogValue: -1,
+      //digitalValue: false,
+      //timeStamp: DateTime.now(),
+    );
   }
-  return Sensor(
-    //    id: 0,
-        description: "",
-        type: -1,
-        //outPutPin1: -1,
-        //outPutPin2: -1,
-        //analogValue: -1,
-        //digitalValue: false,
-        //timeStamp: DateTime.now(),
-      );
-}
 
 // Seleciona eventos cujo sensores estão acima do valor limite de 89
-static Future<List<Sensor>> selectFromTableSensorsLimit() async 
-{
-  List<Sensor> sensors = [];
+  static Future<List<Sensor>> selectFromTableSensorsLimit() async {
+    List<Sensor> sensors = [];
 
-  if (Db.database != null)
-  {
-    List<Map<String, dynamic>> sensorsMap = await Db.database!.query('Sensors', where: 'analogValue > 20');
+    if (Db.database != null) {
+      List<Map<String, dynamic>> sensorsMap =
+          await Db.database!.query('Sensors', where: 'analogValue > 20');
 
-    for (var sensorMap in sensorsMap) {
-      Sensor sensor = Sensor(
-        id : sensorMap['id'],
-        description : sensorMap['description'],
-        type : sensorMap['type'],
-        //outPutPin1 : sensorMap['outPutPin1'],
-        ///outPutPin2 : sensorMap['outPutPin2'],
-        //analogValue : sensorMap['analogValue'],
-        //digitalValue: (sensorMap['digitalValue'] == 1) ? true : false,
-        //timeStamp : DateTime.parse(sensorMap['TimeStamp']),
-      );
+      for (var sensorMap in sensorsMap) {
+        Sensor sensor = Sensor(
+          id: sensorMap['id'],
+          description: sensorMap['description'],
+          type: sensorMap['type'],
+          //outPutPin1 : sensorMap['outPutPin1'],
+          ///outPutPin2 : sensorMap['outPutPin2'],
+          //analogValue : sensorMap['analogValue'],
+          //digitalValue: (sensorMap['digitalValue'] == 1) ? true : false,
+          //timeStamp : DateTime.parse(sensorMap['TimeStamp']),
+        );
 
-      sensors.add(sensor);
+        sensors.add(sensor);
+      }
     }
-  }
 
-  return sensors;
-}
+    return sensors;
+  }
 }

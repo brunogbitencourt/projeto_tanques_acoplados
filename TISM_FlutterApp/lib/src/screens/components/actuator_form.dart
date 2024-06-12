@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/actuators.dart'; // Importe a classe Sensor
+import '../../models/actuator.dart'; // Importe a classe Sensor
 import '../widgets/actuator_widget.dart'; // Importe o widget SensorWidget
 
 

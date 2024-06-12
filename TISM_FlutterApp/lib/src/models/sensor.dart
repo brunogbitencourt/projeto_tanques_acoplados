@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart'; // Se necessário
-
 class Sensor {
   String? id;
   String? description;
@@ -48,6 +46,20 @@ class Sensor {
       'timestamp': timestamp!.toIso8601String(),
       'analogValue': analogValue,
       'digitalValue': digitalValue,
+      'unit': unit,
+    };
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'timestamp': timestamp.toString(),
+      'description': description,
+      'type': type,
+      'outputPin1': outputPin1,
+      'outputPin2': outputPin2,
+      'analogValue': analogValue,
+      'digitalValue': digitalValue == true ? 1 : 0, // SQLite doesn't support boolean directly
       'unit': unit,
     };
   }

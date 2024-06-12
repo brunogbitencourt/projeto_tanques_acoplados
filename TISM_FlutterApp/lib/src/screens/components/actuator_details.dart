@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/actuators.dart';
+import '../../models/actuator.dart';
 
 class ActatorDetails extends StatelessWidget {
   final Actuator actuator;
@@ -14,10 +14,10 @@ class ActatorDetails extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildDetailRow('Description:', actuator.description ?? 'N/A'),
-          _buildDetailRow('Output Pin:', actuator.outPutPin?.toString() ?? 'N/A'),
-          _buildDetailRow('Type: ', actuator.getType()?.toString() ?? 'N/A'),
-          _buildDetailRow('State:', actuator.getState()?.toString() ?? 'N/A'),
-          _buildDetailRow('Last Update:', actuator.getTimeStamp()?.toString() ?? 'N/A'),
+          _buildDetailRow('Output Pin:', actuator.outputPin?.toString() ?? 'N/A'),
+          //_buildDetailRow('Type: ', actuator.getType()?.toString() ?? 'N/A'),
+          //_buildDetailRow('State:', actuator.getState()?.toString() ?? 'N/A'),
+          //_buildDetailRow('Last Update:', actuator.getTimeStamp()?.toString() ?? 'N/A'),
         ],
       ),
     );
