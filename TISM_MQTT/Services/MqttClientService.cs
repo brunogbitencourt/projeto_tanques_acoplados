@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using Firebase.Database;
+using Firebase.Database.Query;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
 using MQTTnet.Client;
@@ -17,10 +19,11 @@ namespace TISM_MQTT.Services
     {
         private readonly ILogger<MqttClientService> _logger;
         private readonly HttpClient _httpClient;
+        private readonly FirebaseClient firebaseClient;
         private IMqttClient _mqttClient;
         private IMqttClientOptions _options;
 
-        public MqttClientService(ILogger<MqttClientService> logger)
+        public MqttClientService(ILogger<MqttClientService> logger, FirebaseClient firebaseClient)
         {
             _logger = logger;
 
@@ -30,6 +33,8 @@ namespace TISM_MQTT.Services
                 ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
             };
             _httpClient = new HttpClient(handler);
+
+            this.firebaseClient = firebaseClient;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -54,14 +59,25 @@ namespace TISM_MQTT.Services
 
             _mqttClient.UseApplicationMessageReceivedHandler(async e =>
             {
+                var topic = e.ApplicationMessage.Topic;
                 var message = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
                 _logger.LogInformation($"Received message: {message}");
 
-                // Process the received message and send to the appropriate API endpoint
                 try
                 {
                     var jsonDoc = System.Text.Json.JsonDocument.Parse(message);
-                    await ProcessMessage(jsonDoc.RootElement);
+                    switch (topic)
+                    {
+                        case "sensors/data":
+                            await ProcessSensorData(jsonDoc.RootElement);
+                            break;
+                        case "actuators/data":
+                            await ProcessActuatorData(jsonDoc.RootElement);
+                            break;
+                        default:
+                            _logger.LogWarning($"Received message from unknown topic: {topic}");
+                            break;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -77,6 +93,75 @@ namespace TISM_MQTT.Services
             {
                 _logger.LogError(ex, "Connection failed");
             }
+        }
+
+        private async Task ProcessActuatorData(JsonElement rootElement)
+        {
+            try
+            {
+                ActuatorData actuatorData = JsonSerializer.Deserialize<ActuatorData>(rootElement.GetRawText());
+
+                if (actuatorData == null)
+                {
+                    _logger.LogWarning("Received message does not contain actuator data.");
+                    return;
+                }
+
+                var formattedTimestamp = actuatorData.Timestamp.ToString("yyyy-MM-dd HH:mm:ss");
+
+                await firebaseClient
+                    .Child("/devices/actuators_data")
+                    .Child(actuatorData.Id)
+                    .Child(formattedTimestamp)
+                    .PutAsync(actuatorData);
+
+                _logger.LogInformation($"Actuator Data {actuatorData.Id} inserted into Firebase");
+
+            }
+            catch (FirebaseException ex)
+            {
+                _logger.LogError(ex, "Error processing and inserting actuator into Firebase");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing and inserting actuator into Firebase");
+            }
+
+        }
+
+        private async Task ProcessSensorData(JsonElement rootElement)
+        {
+            try
+            {
+
+                SensorData sensorData = JsonSerializer.Deserialize<SensorData>(rootElement.GetRawText());
+
+                if (sensorData == null)
+                {
+                    _logger.LogWarning("Received message does not contain sensor data.");
+                    return;
+                }
+
+                var formattedTimestamp = sensorData.Timestamp.ToString("yyyy-MM-dd HH:mm:ss");
+
+                await firebaseClient
+                    .Child("/devices/sensors_data")
+                    .Child(sensorData.Id)
+                    .Child(formattedTimestamp)
+                    .PutAsync(sensorData);
+
+                _logger.LogInformation($"Sensor Data {sensorData.Id} inserted into Firebase");
+
+            }
+            catch(FirebaseException ex)
+            {
+                _logger.LogError(ex, "Error processing and inserting sensor into Firebase");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing and inserting sensor into Firebase");
+            }
+
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
@@ -123,216 +208,5 @@ namespace TISM_MQTT.Services
             }
         }
 
-        private async Task PostSensorToApi(JsonElement sensor)
-        {
-            var sensorJson = sensor.GetRawText(); // Obtém o JSON do sensor
-            var content = new StringContent(sensorJson, Encoding.UTF8, "application/json");
-
-            try
-            {
-                var response = await _httpClient.PostAsync("https://tismfirebase.azurewebsites.net/api/Sensor", content);
-                response.EnsureSuccessStatusCode();
-                var responseBody = await response.Content.ReadAsStringAsync();
-                _logger.LogInformation($"Successfully posted sensor to API. Response: {responseBody}");
-            }
-            catch (HttpRequestException ex)
-            {
-                _logger.LogError(ex, $"Error posting sensor to API. Message: {ex.Message}, Status Code: {ex.StatusCode}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An unexpected error occurred while posting sensor to the API.");
-            }
-        }
-
-        private async Task PostSensorDataToApi(JsonElement sensorData)
-        {
-            var sensorDataJson = sensorData.GetRawText(); // Obtém o JSON dos dados do sensor
-            var content = new StringContent(sensorDataJson, Encoding.UTF8, "application/json");
-
-            try
-            {
-                var response = await _httpClient.PostAsync("https://tismfirebase.azurewebsites.net/api/SensorData", content);
-                response.EnsureSuccessStatusCode();
-                var responseBody = await response.Content.ReadAsStringAsync();
-                _logger.LogInformation($"Successfully posted sensor data to API. Response: {responseBody}");
-            }
-            catch (HttpRequestException ex)
-            {
-                _logger.LogError(ex, $"Error posting sensor data to API. Message: {ex.Message}, Status Code: {ex.StatusCode}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An unexpected error occurred while posting sensor data to the API.");
-            }
-        }
-
-        public async Task PostActuatorToApi(JsonElement actuator)
-        {
-            var actuatorJson = actuator.GetRawText(); // Obtém o JSON do atuador
-            var content = new StringContent(actuatorJson, Encoding.UTF8, "application/json");
-
-            try
-            {
-                var response = await _httpClient.PostAsync("https://tismfirebase.azurewebsites.net/api/Actuator", content);
-                response.EnsureSuccessStatusCode();
-                var responseBody = await response.Content.ReadAsStringAsync();
-                _logger.LogInformation($"Successfully posted actuator to API. Response: {responseBody}");
-            }
-            catch (HttpRequestException ex)
-            {
-                _logger.LogError(ex, $"Error posting actuator to API. Message: {ex.Message}, Status Code: {ex.StatusCode}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An unexpected error occurred while posting actuator to the API.");
-            }
-        }
-
-        private async Task PostActuatorDataToApi(JsonElement actuatorData)
-        {
-            var actuatorDataJson = actuatorData.GetRawText(); // Obtém o JSON dos dados do atuador
-            var content = new StringContent(actuatorDataJson, Encoding.UTF8, "application/json");
-
-            try
-            {
-                var response = await _httpClient.PostAsync("https://tismfirebase.azurewebsites.net/api/ActuatorData", content);
-                response.EnsureSuccessStatusCode();
-                var responseBody = await response.Content.ReadAsStringAsync();
-                _logger.LogInformation($"Successfully posted actuator data to API. Response: {responseBody}");
-            }
-            catch (HttpRequestException ex)
-            {
-                _logger.LogError(ex, $"Error posting actuator data to API. Message: {ex.Message}, Status Code: {ex.StatusCode}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An unexpected error occurred while posting actuator data to the API.");
-            }
-        }
-
-        private async Task ProcessMessage(JsonElement message)
-        {
-            if (message.TryGetProperty("devices", out var devicesProperty))
-            {
-                if (devicesProperty.TryGetProperty("sensors", out var sensorsProperty))
-                {
-                    foreach (var sensorProperty in sensorsProperty.EnumerateObject())
-                    {
-                        var id = sensorProperty.Value.GetProperty("id").GetString();
-                        var description = sensorProperty.Value.GetProperty("description").GetString();
-                        var outputPin1 = sensorProperty.Value.TryGetProperty("OutputPin1", out var outputPin1Property) ? outputPin1Property.GetInt32() : 0;
-                        var outputPin2 = sensorProperty.Value.TryGetProperty("OutputPin2", out var outputPin2Property) ? outputPin2Property.GetInt32() : 0;
-                        var type = sensorProperty.Value.TryGetProperty("Type", out var typeProperty) ? typeProperty.GetInt32() : 0;
-
-                        // Crie o objeto Sensor com as propriedades extraídas
-                        var sensorObj = new Sensor
-                        {
-                            Id = id,
-                            Description = description,
-                            OutputPin1 = outputPin1,
-                            OutputPin2 = outputPin2,
-                            Type = type
-                        };
-
-                        var sensorJson = JsonSerializer.Serialize(sensorObj);
-                        var jsonElement = JsonDocument.Parse(sensorJson).RootElement;
-
-                        await PostSensorToApi(jsonElement);
-                    }
-                }
-                if (devicesProperty.TryGetProperty("sensors_data", out var sensorsDataProperty))
-                {
-                    foreach (var sensorDataProperty in sensorsDataProperty.EnumerateObject())
-                    {
-                        var sensorId = sensorDataProperty.Name;
-                        foreach (var timestampProperty in sensorDataProperty.Value.EnumerateObject())
-                        {
-                            var timestamp = timestampProperty.Name;
-
-                            var id = sensorId;
-                            var timestampValue = timestampProperty.Value.GetProperty("TimeStamp").GetDateTime();
-                            var analogValue = timestampProperty.Value.TryGetProperty("analogValue", out var AnalogValueProperty) ? AnalogValueProperty.GetDouble() : 0;
-                            var digitalValue = timestampProperty.Value.TryGetProperty("digitalValue", out var DigitalValueProperty) ? DigitalValueProperty.GetBoolean() : false;
-                            var unit = timestampProperty.Value.GetProperty("unit").GetString();
-
-                            var sensorDataObj = new SensorData
-                            {
-                                Id = id,
-                                Timestamp = timestampValue,
-                                AnalogValue = analogValue,
-                                DigitalValue = digitalValue,
-                                Unit = unit
-                            };
-
-                            var sensorJson = JsonSerializer.Serialize(sensorDataObj);
-                            var jsonElement = JsonDocument.Parse(sensorJson).RootElement;
-
-                            await PostSensorDataToApi(jsonElement);
-                        }
-                    }
-                }
-                if(devicesProperty.TryGetProperty("actuators", out var actuatorsProperty))
-                {
-                    foreach (var actuatorProperty in actuatorsProperty.EnumerateObject())
-                    {
-                        var id = actuatorProperty.Name;
-                        var description = actuatorProperty.Value.GetProperty("description").GetString();
-                        var outputPin = actuatorProperty.Value.TryGetProperty("outputPin", out var outputPinProperty) ? outputPinProperty.GetInt32() : 0;
-                        var typeActuator = actuatorProperty.Value.TryGetProperty("type", out var typeActuatorProperty) ? typeActuatorProperty.GetInt32() : 0;
-
-                        var actuatorObj = new Actuator
-                        {
-                            Id = id,
-                            Description = description,
-                            OutputPin = outputPin,
-                            TypeActuator = typeActuator
-                        };
-
-                        var actuatorJson = JsonSerializer.Serialize(actuatorObj);
-                        var jsonElement = JsonDocument.Parse(actuatorJson).RootElement;
-
-                        await PostActuatorToApi(jsonElement);
-                    }
-                }
-
-                if (devicesProperty.TryGetProperty("actuators_data", out var actuatorsDataProperty))
-                {
-                    foreach (var actuatorDataProperty in actuatorsDataProperty.EnumerateObject())
-                    {
-                        var actuatorId = actuatorDataProperty.Name;
-                        foreach (var timestampProperty in actuatorDataProperty.Value.EnumerateObject())
-                        {
-                            var timestamp = timestampProperty.Name;
-
-                            var id = actuatorId;
-
-                            var timestampValue = timestampProperty.Value.GetProperty("TimeStamp").GetDateTime();
-                            var outputPWM = timestampProperty.Value.GetProperty("OutputPWM").GetInt32();
-                            var state = timestampProperty.Value.GetProperty("State").GetInt32();
-                            var unit = timestampProperty.Value.GetProperty("Unit").GetString();
-
-                            var actuatorDataObj = new ActuatorData
-                            {
-                                Id = id,
-                                TimeStamp = timestampValue,
-                                OutputPWM = outputPWM,
-                                State = state,
-                                Unit = unit
-                            };
-
-                            var actuatorJson = JsonSerializer.Serialize(actuatorDataObj);
-                            var jsonElement = JsonDocument.Parse(actuatorJson).RootElement;
-
-                            await PostActuatorDataToApi(jsonElement);
-                        }
-                    }
-                }
-            }
-            else
-            {
-                _logger.LogWarning("Received message does not contain the expected structure.");
-            }
-        }
     }
 }
