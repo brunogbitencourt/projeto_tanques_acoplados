@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:appiot/src/models/actuator.dart';
 import 'package:appiot/src/models/sensor.dart';
 import 'package:path/path.dart';
@@ -11,7 +10,7 @@ class Db {
     var databasesPath = await getDatabasesPath();
     String path = join(databasesPath, 'tism.db');
 
-    // Abre o banco de dados e cria a tabela caso não exista
+    // Abre o banco de dados e cria as tabelas caso não existam
     Database database = await openDatabase(
       path,
       version: 1,
@@ -20,9 +19,8 @@ class Db {
             'id TEXT, '
             'timestamp TEXT, '
             'description TEXT, '
-            'type INTEGER, '
-            'outPutPin1 INTEGER, '
-            'outPutPin2 INTEGER, '
+            'outputPin1 INTEGER, '
+            'outputPin2 INTEGER, '
             'analogValue REAL, '
             'digitalValue INTEGER, '
             'unit TEXT, '
@@ -33,14 +31,11 @@ class Db {
             'id TEXT, '
             'timestamp TEXT, '
             'description TEXT, '
-            'typeActuator INTEGER, '
             'outputPin INTEGER, '
-            'state INTEGER, '
             'outputPWM REAL, '
             'unit TEXT, '
-            'PRIMARY KEY (id, timeStamp)' 
-           ')');
-        
+            'PRIMARY KEY (id, timestamp)'
+            ');');
       },
     );
 
@@ -51,120 +46,175 @@ class Db {
     await db.insert(
       'Sensors',
       sensor.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
+      conflictAlgorithm: ConflictAlgorithm.replace, // ou ConflictAlgorithm.ignore, dependendo da lógica desejada
     );
   }
 
   static Future<void> insertActuator(Database db, Actuator actuator) async {
-    await db.update(
-      'Actuators', 
+    await db.insert(
+      'Actuators',
       actuator.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace
+      conflictAlgorithm: ConflictAlgorithm.replace, // ou ConflictAlgorithm.ignore, dependendo da lógica desejada
     );
   }
 
-  static Future<void> insertExampleData(Database? database, int? type) async {
-    Random random = Random();
-    // Inserir alguns dados de exemplo
-    await database?.insert(
+  static Future<List<Actuator>> getAllActuators(Database db) async {
+    final List<Map<String, dynamic>> maps = await db.query('Actuators');
+
+    return List.generate(maps.length, (i) {
+      String id = maps[i]['id'] ?? '';
+      String description = maps[i]['description'] ?? '';
+      int outputPin = maps[i]['outputPin'] ?? 0;
+      double outputPWM = maps[i]['outputPWM'] ?? 0.0;
+      String unit = maps[i]['unit'] ?? '';
+
+      DateTime? timestamp;
+      try {
+        if (maps[i]['timestamp'] != null) {
+          timestamp = DateTime.parse(maps[i]['timestamp']);
+        }
+      } catch (e) {
+        print("Erro ao converter timestamp: $e");
+      }
+
+      return Actuator(
+        id: id,
+        timestamp: timestamp,
+        description: description,
+        outputPin: outputPin,
+        outputPWM: outputPWM,
+        unit: unit,
+      );
+    });
+  }
+
+  static Future<List<Actuator>> getLastValuePerActuator(Database db) async {
+    List<Map<String, dynamic>> maps = await db.rawQuery(
+      'SELECT A.* FROM Actuators A INNER JOIN ('
+      'SELECT id, MAX(timestamp) AS max_timestamp FROM Actuators GROUP BY id'
+      ') B ON A.id = B.id AND A.timestamp = B.max_timestamp'
+    );
+    print("fez o select");
+
+    return maps.map((map) {
+      return Actuator(
+        id: map['id'],
+        timestamp: DateTime.tryParse(map['timestamp']),
+        description: map['description'],
+        outputPin: map['outputPin'],
+        outputPWM: map['outputPWM'] != null ? double.tryParse(map['outputPWM'].toString()) : null,
+        unit: map['unit'],
+      );
+    }).toList();
+}
+
+
+  // Método para pegar todos os sensores
+  static Future<List<Sensor>> getAllSensors(Database db) async {
+    final List<Map<String, dynamic>> maps = await db.query('Sensors');
+
+    return List.generate(maps.length, (i) {
+      String id = maps[i]['id'] ?? '';
+      String description = maps[i]['description'] ?? '';
+      int outputPin1 = maps[i]['outputPin1'] ?? 0;
+      int outputPin2 = maps[i]['outputPin2'] ?? 0;
+      double analogValue = maps[i]['analogValue'] ?? 0.0;
+      bool digitalValue = maps[i]['digitalValue'] == 1;
+      String unit = maps[i]['unit'] ?? '';
+
+      DateTime? timestamp;
+      try {
+        if (maps[i]['timestamp'] != null) {
+          timestamp = DateTime.parse(maps[i]['timestamp']);
+        }
+      } catch (e) {
+        print("Erro ao converter timestamp: $e");
+      }
+
+      return Sensor(
+        id: id,
+        description: description,
+        outputPin1: outputPin1,
+        outputPin2: outputPin2,
+        timestamp: timestamp,
+        analogValue: analogValue,
+        digitalValue: digitalValue,
+        unit: unit,
+      );
+    });
+  }
+
+  // Método para pegar o último valor de cada sensor existente
+  static Future<List<Sensor>> getLastValuePerSensor(Database db) async {
+  // Consulta para pegar os IDs distintos de sensores
+  final List<Map<String, dynamic>> uniqueSensorIds = await db.rawQuery(
+    'SELECT DISTINCT id FROM Sensors'
+  );
+
+  List<Sensor> sensors = [];
+
+  // Para cada sensor distinto encontrado
+  for (var sensorIdMap in uniqueSensorIds) {
+    String sensorId = sensorIdMap['id'];
+
+    // Consulta para obter o último registro do sensor específico
+    final List<Map<String, dynamic>> result = await db.query(
       'Sensors',
-      {
-        'description': "Sensor de nivel",
-        'type': type,
-        'outPutPin1': 22,
-        'outPutPin2': 21,
-        'analogValue': random.nextDouble() * 100,
-        'digitalValue': 0,
-        'timeStamp': DateTime.now().toString(),
-      },
+      where: 'id = ?',
+      whereArgs: [sensorId],
+      orderBy: 'timestamp DESC',
+      limit: 1,
+    );
+
+    if (result.isNotEmpty) {
+      String id = result[0]['id'] ?? '';
+      String description = result[0]['description'] ?? '';
+      int outputPin1 = result[0]['outputPin1'] ?? 0;
+      int outputPin2 = result[0]['outputPin2'] ?? 0;
+      double analogValue = result[0]['analogValue'] ?? 0.0;
+      bool digitalValue = result[0]['digitalValue'] == 1;
+      String unit = result[0]['unit'] ?? '';
+
+      DateTime? timestamp;
+      try {
+        if (result[0]['timestamp'] != null) {
+          timestamp = DateTime.parse(result[0]['timestamp']);
+        }
+      } catch (e) {
+        print("Erro ao converter timestamp: $e");
+      }
+
+      sensors.add(Sensor(
+        id: id,
+        description: description,
+        outputPin1: outputPin1,
+        outputPin2: outputPin2,
+        timestamp: timestamp,
+        analogValue: analogValue,
+        digitalValue: digitalValue,
+        unit: unit,
+      ));
+    }
+  }
+
+  return sensors;
+}
+
+
+  static Future<void> updateActuator(Database db, Actuator actuator) async {
+    await db.update(
+      'Actuators',
+      actuator.toMap(),
+      where: 'id = ?',
+      whereArgs: [actuator.id],
     );
   }
 
-  static Future<List<Sensor>> selectFromTableSensors() async {
-    List<Sensor> sensors = [];
-
-    if (Db.database != null) {
-      List<Map<String, dynamic>> sensorsMap =
-          await Db.database!.query('Sensors');
-
-      for (var sensorMap in sensorsMap) {
-        Sensor sensor = Sensor(
-          id: sensorMap['id'],
-          description: sensorMap['description'],
-          type: sensorMap['type'],
-          //outPutPin1 : sensorMap['outPutPin1'],
-          //outPutPin2 : sensorMap['outPutPin2'],
-          //analogValue : sensorMap['analogValue'],
-          //digitalValue : sensorMap['digitalValue'],
-          //timeStamp : DateTime.parse(sensorMap['TimeStamp']),
-        );
-
-        sensors.add(sensor);
-      }
-    }
-
-    return sensors;
-  }
-
-  static Future<Sensor> getLastSensorByType(int type) async {
-    if (Db.database != null) {
-      List<Map<String, dynamic>> result = await Db.database!.rawQuery('''
-      SELECT *
-      FROM Sensors
-      WHERE type = ?
-      ORDER BY timeStamp DESC
-      LIMIT 1
-    ''', [type]);
-
-      if (result.isNotEmpty) {
-        return Sensor(
-          id: result[0]['id'],
-          description: result[0]['description'],
-          type: result[0]['type'],
-          //outPutPin1: result[0]['outPutPin1'],
-          //outPutPin2: result[0]['outPutPin2'],
-          //analogValue: result[0]['analogValue'],
-          //digitalValue: (result[0]['digitalValue'] == 1) ? true : false,
-          //timeStamp: DateTime.parse(result[0]['timeStamp']),
-        );
-      }
-    }
-    return Sensor(
-      //    id: 0,
-      description: "",
-      type: -1,
-      //outPutPin1: -1,
-      //outPutPin2: -1,
-      //analogValue: -1,
-      //digitalValue: false,
-      //timeStamp: DateTime.now(),
+  static Future<void> deleteActuator(Database db, String id) async {
+    await db.delete(
+      'Actuators',
+      where: 'id = ?',
+      whereArgs: [id],
     );
-  }
-
-// Seleciona eventos cujo sensores estão acima do valor limite de 89
-  static Future<List<Sensor>> selectFromTableSensorsLimit() async {
-    List<Sensor> sensors = [];
-
-    if (Db.database != null) {
-      List<Map<String, dynamic>> sensorsMap =
-          await Db.database!.query('Sensors', where: 'analogValue > 20');
-
-      for (var sensorMap in sensorsMap) {
-        Sensor sensor = Sensor(
-          id: sensorMap['id'],
-          description: sensorMap['description'],
-          type: sensorMap['type'],
-          //outPutPin1 : sensorMap['outPutPin1'],
-          ///outPutPin2 : sensorMap['outPutPin2'],
-          //analogValue : sensorMap['analogValue'],
-          //digitalValue: (sensorMap['digitalValue'] == 1) ? true : false,
-          //timeStamp : DateTime.parse(sensorMap['TimeStamp']),
-        );
-
-        sensors.add(sensor);
-      }
-    }
-
-    return sensors;
   }
 }

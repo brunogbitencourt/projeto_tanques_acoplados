@@ -1,7 +1,6 @@
 class Sensor {
   String? id;
   String? description;
-  int? type;
   int? outputPin1;
   int? outputPin2;
   DateTime? timestamp;
@@ -12,7 +11,6 @@ class Sensor {
   Sensor({
     this.id,
     this.description,
-    this.type,
     this.outputPin1,
     this.outputPin2,
     this.timestamp,
@@ -22,25 +20,22 @@ class Sensor {
   });
 
   factory Sensor.fromJson(Map<String, dynamic> json) {
-  return Sensor(
-    id: json['id'],
-    description: json['description'],
-    type: json['type'],
-    outputPin1: json['outputPin1'],
-    outputPin2: json['outputPin2'],
-    timestamp: DateTime.tryParse(json['timestamp'] ?? ''),
-    analogValue: (json['analogValue'] as num?)?.toDouble() ?? 0.0, // Convertendo para double
-    digitalValue: json['digitalValue'],
-    unit: json['unit'],
-  );
-}
-
+    return Sensor(
+      id: json['id'],
+      description: json['description'],
+      outputPin1: json['outputPin1'],
+      outputPin2: json['outputPin2'],
+      timestamp: DateTime.tryParse(json['timestamp'] ?? ''),
+      analogValue: (json['analogValue'] as num?)?.toDouble() ?? 0.0,
+      digitalValue: json['digitalValue'],
+      unit: json['unit'],
+    );
+  }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'description': description,
-      'type': type,
       'outputPin1': outputPin1,
       'outputPin2': outputPin2,
       'timestamp': timestamp!.toIso8601String(),
@@ -55,7 +50,6 @@ class Sensor {
       'id': id,
       'timestamp': timestamp.toString(),
       'description': description,
-      'type': type,
       'outputPin1': outputPin1,
       'outputPin2': outputPin2,
       'analogValue': analogValue,

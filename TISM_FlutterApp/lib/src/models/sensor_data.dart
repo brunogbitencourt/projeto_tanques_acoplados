@@ -16,7 +16,7 @@ class SensorData {
   SensorData.fromJson(Map<String, dynamic> json) {
     id = json['id'];
     timestamp = DateTime.parse(json['timestamp']);
-    analogValue = json['analogValue'];
+    analogValue = json['analogValue']?.toDouble(); // Convert to double
     digitalValue = json['digitalValue'];
     unit = json['unit'];
   }
