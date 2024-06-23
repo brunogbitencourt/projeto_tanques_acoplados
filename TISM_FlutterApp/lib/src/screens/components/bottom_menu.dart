@@ -16,8 +16,8 @@ class _BottomMenuState extends State<BottomMenu> {
   @override
   Widget build(BuildContext context) {
     return BottomNavigationBar(
-      backgroundColor: Colors.blue,
-      selectedItemColor: Colors.blue,
+      backgroundColor: Colors.green.shade700,
+      selectedItemColor: Colors.green.shade700,
       unselectedItemColor: Colors.grey,
       currentIndex: _selectedIndex,
       onTap: (index) {

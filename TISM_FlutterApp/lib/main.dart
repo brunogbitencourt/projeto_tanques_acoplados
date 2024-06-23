@@ -17,6 +17,20 @@ void main() async {
     print("Erro ao conectar ao banco de dados: $e");
   }
 
+  try {
+    await LoadInitialDataSensor(); // Conecta ao banco de dados
+  } catch (e) {
+    print("Erro ao carregar dados sensores: $e");
+  }
+
+  try {
+    await LoadInitialDataActuator(); // Conecta ao banco de dados
+  } catch (e) {
+    print("Erro ao carregar dados sensores: $e");
+  }
+
+
+
   // Inicia a tarefa em background para buscar dados da API e inserir no banco de dados a cada 5 segundos
   Timer.periodic(Duration(seconds: 60), (timer) async {
     await fetchAndStoreSensorData();
@@ -36,6 +50,82 @@ void main() async {
     runApp(MyApp(initialRoute: '/login'));
   }
 }
+
+Future<void> LoadInitialDataActuator() async {
+  final Firebaseapi _firebaseapi = Firebaseapi();
+
+  try {
+    // Obtém a lista de informações dos atuadores da API Firebase
+    final actuatorInfoList = await _firebaseapi.fetchActuatorInfo();
+    print('Fetched ${actuatorInfoList.length} actuators info.');
+
+    // Supondo que getAllActuatorDataAPI agora retorna Map<String, List<Actuator>>
+    final actuatorDataMap = await _firebaseapi.getAllActuatorDataAPI(actuatorInfoList);
+    print('Fetched data for ${actuatorDataMap.keys.length} actuators.');
+
+    // Itera sobre cada actuatorInfo para processar a lista de registros de atuador
+    for (var info in actuatorInfoList) {
+      List<Actuator> actuatorList = actuatorDataMap[info.id] ?? [];
+
+      for (var actuatorData in actuatorList) {
+        var actuatorOut = Actuator(
+          id: info.id,
+          timestamp: actuatorData.timestamp,
+          description: info.description,
+          outputPin: actuatorData.outputPin,
+          outputPWM: actuatorData.outputPWM,
+          unit: actuatorData.unit,
+        );
+
+        await Db.insertActuator(Db.database!, actuatorOut);
+        print("Inserted actuator ${info.id}, ${actuatorData.timestamp} into the database.");
+      }
+    }
+  } catch (e) {
+    print('Exception caught: $e');
+  }
+}
+
+
+
+Future<void> LoadInitialDataSensor() async {
+  final Firebaseapi _firebaseapi = Firebaseapi();
+
+  try {
+    final sensorInfoList = await _firebaseapi.fetchSensorInfo();
+    print('Fetched ${sensorInfoList.length} sensors info.');
+
+    // Supondo que getAllSensorDataAPI agora retorna Map<String, List<Sensor>>
+    final sensorDataMap = await _firebaseapi.getAllSensorDataAPI(sensorInfoList);
+    print('Fetched data for ${sensorDataMap.keys.length} sensors.');
+
+    // Itera sobre cada sensorInfo para processar a lista de registros de sensor
+    for (var info in sensorInfoList) {
+      List<Sensor> sensorList = sensorDataMap[info.id] ?? [];
+
+      for (var sensorData in sensorList) {
+        var sensorOut = Sensor(
+          id: info.id,
+          timestamp: sensorData.timestamp,
+          description: info.description,
+          outputPin1: info.outputPin1,
+          outputPin2: info.outputPin2,
+          analogValue: sensorData.analogValue,
+          digitalValue: sensorData.digitalValue,
+          unit: sensorData.unit,
+        );
+
+        await Db.insertSensor(Db.database!, sensorOut);
+        print("Inserted sensor ${info.id}, ${sensorData.timestamp} into the database.");
+      }
+    }
+  } catch (e) {
+    print('Exception caught: $e');
+  }
+}
+
+
+
 
 Future<void> fetchAndStoreSensorData() async {
   final Firebaseapi _firebaseapi = Firebaseapi();
