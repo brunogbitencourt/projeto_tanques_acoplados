@@ -18,13 +18,13 @@ void main() async {
   }
 
   try {
-    await LoadInitialDataSensor(); // Conecta ao banco de dados
+    //await LoadInitialDataSensor(); // Conecta ao banco de dados
   } catch (e) {
     print("Erro ao carregar dados sensores: $e");
   }
 
   try {
-    await LoadInitialDataActuator(); // Conecta ao banco de dados
+    //await LoadInitialDataActuator(); // Conecta ao banco de dados
   } catch (e) {
     print("Erro ao carregar dados sensores: $e");
   }
@@ -32,7 +32,7 @@ void main() async {
 
 
   // Inicia a tarefa em background para buscar dados da API e inserir no banco de dados a cada 5 segundos
-  Timer.periodic(Duration(seconds: 60), (timer) async {
+  Timer.periodic(Duration(seconds: 30), (timer) async {
     await fetchAndStoreSensorData();
     await fetchAndStoreActuatorData();
   });

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../home_screen.dart';
 import '../events_screen.dart';
-import '../actuators_screen.dart';
+import '../data_view_screen.dart';
 
 class BottomMenu extends StatefulWidget {
   const BottomMenu({Key? key}) : super(key: key);
@@ -16,7 +16,7 @@ class _BottomMenuState extends State<BottomMenu> {
   @override
   Widget build(BuildContext context) {
     return BottomNavigationBar(
-      backgroundColor: Colors.green.shade700,
+      backgroundColor: Color.fromARGB(255, 180, 226, 182),
       selectedItemColor: Colors.green.shade700,
       unselectedItemColor: Colors.grey,
       currentIndex: _selectedIndex,
@@ -46,7 +46,7 @@ class _BottomMenuState extends State<BottomMenu> {
           case 2:
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (context) => ActuatorsScreen()),
+              MaterialPageRoute(builder: (context) => DataViewScreen()),
               (route) => false,
             );
             break;
@@ -71,14 +71,6 @@ class _BottomMenuState extends State<BottomMenu> {
         BottomNavigationBarItem(
           icon: Icon(Icons.data_usage),
           label: 'Actuators',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.settings),
-          label: 'Configurations',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.info),
-          label: 'About Us',
         ),
       ],
     );

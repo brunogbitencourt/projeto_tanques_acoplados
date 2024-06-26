@@ -1,8 +1,11 @@
+import 'dart:convert';
+import 'dart:async';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
+import '../../db/db.dart';
 import '../../models/actuator.dart';
 import '../components/actuator_details.dart';
 import 'package:intl/intl.dart'; // Importe o pacote intl
-
 
 class ActuatorWidget extends StatefulWidget {
   final Actuator actuator;
@@ -14,31 +17,40 @@ class ActuatorWidget extends StatefulWidget {
 }
 
 class _ActuatorWidgetState extends State<ActuatorWidget> {
-  late bool isValve;
   late double sliderValue;
   late String textTitle; // Variável para armazenar o título personalizado
 
   @override
   void initState() {
     super.initState();
-    isValve = widget.actuator.id?.startsWith('AV') ?? false;
-    sliderValue = (widget.actuator.outputPWM ?? 0).toDouble(); // Inicializa com o valor do banco convertido para double
-    
-    // Define o texto de título baseado no prefixo do id do atuador
-    if (widget.actuator.id?.startsWith("AV") ?? false) {
-      textTitle = "Valve " + (widget.actuator.id ?? "");
-    } else if (widget.actuator.id?.startsWith("AM") ?? false) {
-      textTitle = "Motor " + (widget.actuator.id ?? "");
-    } else if (widget.actuator.id?.startsWith("AP") ?? false) {
-      textTitle = "Pump " + (widget.actuator.id ?? "");
-    } else {
-      textTitle = widget.actuator.id ?? ""; // Caso padrão, use o ID como está
+    sliderValue = widget.actuator.outputPWM ?? 0;
+    textTitle = _buildTitle(widget.actuator.id);
+    _initializeDatabase();
+  }
+
+  Future<void> _initializeDatabase() async {
+    try {
+      Db.database = await Db.connect();
+    } catch (e) {
+      print("Erro ao conectar ao banco de dados: $e");
     }
+  }
+
+  String _buildTitle(String? id) {
+    if (id == null) return '';
+    if (id.startsWith("AV")) {
+      return "Valve $id";
+    } else if (id.startsWith("AM")) {
+      return "Motor $id";
+    } else if (id.startsWith("AP")) {
+      return "Pump $id";
+    }
+    return id; // Caso padrão, use o ID como está
   }
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd/MM/yyyy HH:mm:ss'); // Formato de data desejado
+    final dateFormat = DateFormat('dd/MM/yyyy HH:mm:ss');
     return Card(
       elevation: 3,
       margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -53,7 +65,7 @@ class _ActuatorWidgetState extends State<ActuatorWidget> {
             padding: EdgeInsets.all(8.0),
             color: Colors.green.shade700,
             child: Text(
-              textTitle, // Usa o título personalizado
+              textTitle,
               style: TextStyle(
                 fontSize: 18.0,
                 fontWeight: FontWeight.bold,
@@ -61,58 +73,7 @@ class _ActuatorWidgetState extends State<ActuatorWidget> {
               ),
             ),
           ),
-          SizedBox(height: 4),
           ListTile(
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (isValve)
-                  Row(
-                    children: [
-                      Switch(
-                        value: widget.actuator.outputPWM != 0,
-                        onChanged: (value) {
-                          setState(() {
-                            if (value) {
-                              widget.actuator.outputPWM = 100.0; // Define o valor de outputPWM para abrir completamente a válvula
-                              sliderValue = 100.0; // Atualiza o slider
-                            } else {
-                              widget.actuator.outputPWM = 0.0; // Define o valor de outputPWM para fechar completamente a válvula
-                              sliderValue = 0.0; // Atualiza o slider
-                            }
-                          });
-                        },
-                        activeColor: Colors.green.shade700,
-                      ),
-                    ],
-                  ),
-                if (!isValve)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Slider(
-                        value: sliderValue,
-                        min: 0.0,
-                        max: 100.0,
-                        divisions: 100,
-                        label: '${sliderValue.round()}%',
-                        onChanged: (value) {
-                          setState(() {
-                            sliderValue = value;
-                            widget.actuator.outputPWM = value; // Atualiza o valor de outputPWM
-                          });
-                        },
-                        activeColor: Colors.green.shade700,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        '%: ${widget.actuator.outputPWM?.toStringAsFixed(2)}', // Exibe o valor de outputPWM
-                        style: TextStyle(fontSize: 16.0),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
             onTap: () {
               showModalBottomSheet(
                 context: context,
@@ -121,21 +82,111 @@ class _ActuatorWidgetState extends State<ActuatorWidget> {
                 },
               );
             },
+            subtitle: _buildControlWidgets(),
           ),
-          SizedBox(height: 4),
           Divider(
             color: Colors.green.shade700,
             thickness: 1,
             indent: 16,
             endIndent: 16,
           ),
-          SizedBox(height: 4),
-          Text(
-            "  " + dateFormat.format(widget.actuator.timestamp ?? DateTime.now()), // Formatar a data
-            style: TextStyle(fontSize: 12.0),
+          Padding(
+            padding: const EdgeInsets.all(4.0),
+            child: Text(
+              "  " + dateFormat.format(widget.actuator.timestamp ?? DateTime.now()),
+              style: TextStyle(fontSize: 12.0),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildControlWidgets() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Switch(
+              value: widget.actuator.outputPWM != 0,
+              onChanged: (value) async {
+                double newPWM = value ? 100.0 : 0.0;
+                setState(() {
+                  widget.actuator.outputPWM = newPWM;
+                  sliderValue = newPWM;
+                });
+                await _updateActuatorAndSendData(newPWM);
+              },
+              activeColor: Colors.green.shade700,
+            ),
+          ],
+        ),
+        // Outros widgets ou controles podem ser adicionados aqui
+      ],
+    );
+  }
+
+  Future<void> _updateActuatorAndSendData(double newPWM) async {
+    widget.actuator.outputPWM = newPWM;
+    await Db.insertActuator(Db.database!, widget.actuator);
+    await sendDataToAPI();
+    await publishMqttMessage(widget.actuator.id!, newPWM.toInt());
+  }
+
+  Future<void> sendDataToAPI() async {
+    Map<String, dynamic> actuatorData = {
+      'Id': widget.actuator.id ?? 'default_id', // Adiciona um id padrão caso seja null
+      'Timestamp': widget.actuator.timestamp?.toIso8601String() ?? '',
+      'PwmOutput': widget.actuator.outputPWM ?? 0,
+      'State': 0, // Ajuste conforme necessário
+      //'Unit': widget.actuator.unit ?? 'V'
+    };
+
+    Map<String, dynamic> payload = {
+      'actuatorData': actuatorData  // Envolve os dados do atuador no campo esperado pela API
+    };
+
+    String jsonString = json.encode(payload);
+    String apiUrl = 'https://tismfirebase.azurewebsites.net/api/ActuatorData';
+
+    try {
+      http.Response response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonString
+      );
+
+      if (response.statusCode == 200) {
+        print('Dados enviados com sucesso!');
+      } else {
+        print('Falha ao enviar dados: ${response.statusCode}');
+        print('Resposta: ${response.body}');
+      }
+    } catch (e) {
+      print('Erro ao enviar dados: $e');
+    }
+  }
+
+  Future<void> publishMqttMessage(String id, int pwmValue) async {
+    String topic = "actions";
+    String message = "$id-$pwmValue";
+
+    var url = Uri.parse('https://tismmqtt.azurewebsites.net/api/Mqtt/publish');
+    var body = jsonEncode({
+      'topic': topic,
+      'message': message
+    });
+
+    try {
+      var response = await http.post(url, body: body, headers: {'Content-Type': 'application/json'});
+      if (response.statusCode == 200) {
+        print('MQTT message ${message} published successfully');
+      } else {
+        print('Failed to publish MQTT message: ${response.body}');
+      }
+    } catch (e) {
+      print('Error sending MQTT message: $e');
+    }
   }
 }
