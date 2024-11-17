@@ -120,9 +120,3 @@ Repositório original: [TISM App](https://github.com/brunogbitencourt/TISM_App)
 Este projeto foi desenvolvido no contexto das disciplinas de **Internet das Coisas** e **Laboratório de Dispositivos Móveis** da **Pontifícia Universidade Católica de Minas Gerais**.
 
 ---
-
-## Licença
-
-Este projeto é distribuído sob a licença MIT. Consulte o arquivo [LICENSE](LICENSE) para mais informações.
-
----
